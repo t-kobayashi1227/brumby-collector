@@ -20,6 +20,10 @@ function makeRow(overrides: Partial<Row> = {}): Row {
     layout: '4LDK',
     built_ym: '1998-05',
     station_raw: 'JR信越本線「新潟」徒歩15分',
+    layout_rooms: '4',
+    layout_type: 'LDK',
+    layout_storage: '0',
+    walk_minutes: '15',
     ...overrides,
   };
 }
@@ -51,7 +55,7 @@ describe('rowsToCsv', () => {
     const csv = rowsToCsv([makeRow()]);
     const lines = csv.split('\r\n').filter(Boolean);
     expect(lines[0]).toBe(
-      'fetched_on,listing_id,listing_url,city,ward,town,address_raw,price_man,land_area_m2,building_area_m2,layout,built_ym,station_raw'
+      'fetched_on,listing_id,listing_url,city,ward,town,address_raw,price_man,land_area_m2,building_area_m2,layout,built_ym,station_raw,layout_rooms,layout_type,layout_storage,walk_minutes'
     );
     expect(lines[1]).toContain('2480');
   });

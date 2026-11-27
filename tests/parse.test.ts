@@ -7,8 +7,10 @@ import {
   extractTown,
   parseAreaM2,
   parseBuiltYm,
+  parseLayout,
   parseListingPage,
   parsePriceMan,
+  parseWalkMinutes,
   type RawListingItem,
 } from '../lib/suumo/parse';
 
@@ -140,6 +142,59 @@ describe('parseBuiltYm', () => {
   });
 });
 
+describe('parseLayout', () => {
+  it('部屋数とタイプに分ける', () => {
+    expect(parseLayout('4LDK')).toEqual({ rooms: 4, type: 'LDK', storage: 0 });
+    expect(parseLayout('7DK')).toEqual({ rooms: 7, type: 'DK', storage: 0 });
+    expect(parseLayout('3K')).toEqual({ rooms: 3, type: 'K', storage: 0 });
+  });
+
+  it('納戸（S）は部屋数に含めず納戸数として分ける', () => {
+    expect(parseLayout('4LDK+S（納戸）')).toEqual({ rooms: 4, type: 'LDK', storage: 1 });
+    expect(parseLayout('4LDK+2S（納戸）')).toEqual({ rooms: 4, type: 'LDK', storage: 2 });
+  });
+
+  it('二世帯向けの LLDDKK などはタイプをそのまま保持する', () => {
+    expect(parseLayout('6LLDDKK+S（納戸）')).toEqual({ rooms: 6, type: 'LLDDKK', storage: 1 });
+    expect(parseLayout('4LDKK+2S（納戸）')).toEqual({ rooms: 4, type: 'LDKK', storage: 2 });
+  });
+
+  it('ワンルームは1部屋・タイプRとして扱う', () => {
+    expect(parseLayout('ワンルーム')).toEqual({ rooms: 1, type: 'R', storage: 0 });
+    expect(parseLayout('ワンルーム+S（納戸）')).toEqual({ rooms: 1, type: 'R', storage: 1 });
+  });
+
+  it('全角表記も変換する', () => {
+    expect(parseLayout('４ＬＤＫ＋Ｓ（納戸）')).toEqual({ rooms: 4, type: 'LDK', storage: 1 });
+  });
+
+  it('解釈できない表記は null を返す', () => {
+    expect(parseLayout('その他')).toBeNull();
+    expect(parseLayout(null)).toBeNull();
+  });
+});
+
+describe('parseWalkMinutes', () => {
+  it('徒歩の分数を返す', () => {
+    expect(parseWalkMinutes('ＪＲ信越本線「新潟」徒歩42分')).toBe(42);
+  });
+
+  it('複数ある場合は最も短い徒歩分数を返す', () => {
+    expect(parseWalkMinutes('JR白新線「新潟」徒歩12分／新潟交通バス「東大通」徒歩3分')).toBe(3);
+  });
+
+  it('バス利用・車での距離は徒歩分数として扱わない', () => {
+    expect(parseWalkMinutes('ＪＲ越後線「新潟」バス20分停歩4分')).toBeNull();
+    expect(parseWalkMinutes('ＪＲ白新線「新潟」車2.6km')).toBeNull();
+    expect(parseWalkMinutes('ＪＲ越後線「新潟」バス20分停歩4分／新潟交通「白山前」徒歩9分')).toBe(9);
+  });
+
+  it('値が取れない場合は null を返す', () => {
+    expect(parseWalkMinutes(null)).toBeNull();
+    expect(parseWalkMinutes('')).toBeNull();
+  });
+});
+
 describe('extractTown', () => {
   const prefix = '新潟市中央区';
 
@@ -257,6 +312,10 @@ describe('buildRow', () => {
         layout: '4LDK',
         built_ym: '1998-05',
         station_raw: 'JR白新線「新潟」徒歩12分／新潟交通バス「東大通」徒歩3分',
+        layout_rooms: '4',
+        layout_type: 'LDK',
+        layout_storage: '0',
+        walk_minutes: '3',
       });
     }
   });

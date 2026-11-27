@@ -195,6 +195,8 @@ async function main(): Promise<number> {
     layout: 0,
     built_ym: 0,
     station_raw: 0,
+    layout_rooms: 0,
+    walk_minutes: 0,
   };
   for (const row of rows) {
     for (const key of Object.keys(missingCounts)) {

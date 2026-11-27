@@ -34,6 +34,10 @@ export interface Row {
   layout: string;
   built_ym: string;
   station_raw: string;
+  layout_rooms: string;
+  layout_type: string;
+  layout_storage: string;
+  walk_minutes: string;
 }
 
 export const CSV_COLUMNS: (keyof Row)[] = [
@@ -50,6 +54,10 @@ export const CSV_COLUMNS: (keyof Row)[] = [
   'layout',
   'built_ym',
   'station_raw',
+  'layout_rooms',
+  'layout_type',
+  'layout_storage',
+  'walk_minutes',
 ];
 
 const NO_RESULTS_PHRASES = [
@@ -248,6 +256,42 @@ export function parseBuiltYm(text: string | null): string | null {
   return `${year}-${month}`;
 }
 
+export interface Layout {
+  rooms: number;
+  type: string;
+  storage: number;
+}
+
+// NFKC folds full-width forms (４ＬＤＫ＋Ｓ) into ASCII so one pattern covers both.
+// "S" counts 納戸 separately: it is not a legal living room, so it is kept out of rooms.
+const LAYOUT_PATTERN = /^(?:(\d+)([LDK]+)|ワンルーム)(?:\+(\d*)S)?/;
+
+export function parseLayout(text: string | null): Layout | null {
+  if (!text) return null;
+  const match = text.normalize('NFKC').trim().match(LAYOUT_PATTERN);
+  if (!match) return null;
+  const storage = match[3] === undefined ? 0 : match[3] === '' ? 1 : parseInt(match[3], 10);
+  if (match[1] === undefined) {
+    return { rooms: 1, type: 'R', storage };
+  }
+  return { rooms: parseInt(match[1], 10), type: match[2], storage };
+}
+
+// Only plain 徒歩 entries count. "バスN分停歩N分" (walk from a bus stop after a ride)
+// and "車Nkm" are not walking distance from the station, so they are ignored.
+// Note: entries for bus lines (e.g. 新潟交通「…」徒歩3分) are included as SUUMO lists them.
+export function parseWalkMinutes(text: string | null): number | null {
+  if (!text) return null;
+  let best: number | null = null;
+  for (const entry of text.normalize('NFKC').split('/')) {
+    const match = entry.match(/徒歩(\d+)分/);
+    if (!match) continue;
+    const minutes = parseInt(match[1], 10);
+    if (best === null || minutes < best) best = minutes;
+  }
+  return best;
+}
+
 const DIGIT_PATTERN = /[0-9０-９]/;
 
 export function extractTown(addressRaw: string | null, cityWardPrefix: string): string | null {
@@ -311,6 +355,8 @@ export function buildRow(item: RawListingItem, ctx: BuildRowContext): BuildRowRe
   const landArea = parseAreaM2(item.landAreaText);
   const buildingArea = parseAreaM2(item.buildingAreaText);
   const builtYm = parseBuiltYm(item.builtText);
+  const layout = parseLayout(item.layoutText);
+  const walkMinutes = parseWalkMinutes(item.stationText);
 
   const row: Row = {
     fetched_on: ctx.fetchedOn,
@@ -326,6 +372,10 @@ export function buildRow(item: RawListingItem, ctx: BuildRowContext): BuildRowRe
     layout: item.layoutText ?? '',
     built_ym: builtYm ?? '',
     station_raw: item.stationText ?? '',
+    layout_rooms: layout ? String(layout.rooms) : '',
+    layout_type: layout ? layout.type : '',
+    layout_storage: layout ? String(layout.storage) : '',
+    walk_minutes: walkMinutes !== null ? String(walkMinutes) : '',
   };
 
   return { status: 'ok', row };
